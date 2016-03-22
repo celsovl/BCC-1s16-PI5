@@ -19,14 +19,18 @@ namespace Radar
             TcpClient servidorCanhao = new TcpClient();
             servidorCanhao.Connect(IPAddress.Parse(ip), porta);
 
-            int offset = 0;
-            while (offset < pacote.Length)
-                offset += servidorCanhao.Client.Receive(pacote, offset, pacote.Length - offset, SocketFlags.None);
+            for (int i = 0; i < 10; i++)
+            {
+                int offset = 0;
+                while (offset < pacote.Length)
+                    offset += servidorCanhao.Client.Receive(pacote, offset, pacote.Length - offset, SocketFlags.None);
 
-            byte[] dados = Encoding.ASCII.GetBytes(mensagem);
-            pacote[0] = (byte)dados.Length;
-            dados.CopyTo(pacote, 1);
-            servidorCanhao.Client.Send(pacote);
+                byte[] dados = Encoding.ASCII.GetBytes(mensagem);
+                pacote[0] = (byte)dados.Length;
+                dados.CopyTo(pacote, 1);
+                servidorCanhao.Client.Send(pacote);
+            }
+
             servidorCanhao.Close();
         }
     }
