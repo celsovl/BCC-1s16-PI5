@@ -1,9 +1,15 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2012
+# Visual Studio 14
+VisualStudioVersion = 14.0.25123.0
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Radar", "Radar\Radar.csproj", "{4F6E7A20-D52A-4095-9A51-36CAF29E7106}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Canhao", "Canhao\Canhao.csproj", "{1EFAAC8C-CE09-40F1-90A3-1BA459909BD7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Comum", "Comum\Comum.csproj", "{F95C1DC5-5B2A-4601-9CD8-F159D45A037B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Testes", "Testes\Testes.csproj", "{4E3F071C-2D2E-4A54-8560-61B451834897}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -19,6 +25,14 @@ Global
 		{1EFAAC8C-CE09-40F1-90A3-1BA459909BD7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1EFAAC8C-CE09-40F1-90A3-1BA459909BD7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1EFAAC8C-CE09-40F1-90A3-1BA459909BD7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F95C1DC5-5B2A-4601-9CD8-F159D45A037B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F95C1DC5-5B2A-4601-9CD8-F159D45A037B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F95C1DC5-5B2A-4601-9CD8-F159D45A037B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F95C1DC5-5B2A-4601-9CD8-F159D45A037B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4E3F071C-2D2E-4A54-8560-61B451834897}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4E3F071C-2D2E-4A54-8560-61B451834897}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4E3F071C-2D2E-4A54-8560-61B451834897}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4E3F071C-2D2E-4A54-8560-61B451834897}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
