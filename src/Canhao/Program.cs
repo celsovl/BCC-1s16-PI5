@@ -17,12 +17,6 @@ namespace Canhao
             string mensagem = "AVIAO A VISTA";
             byte[] pacote = new byte[64];
 
-            TcpListener servidor = new TcpListener(IPAddress.Parse(ip), porta);
-            servidor.Start();
-
-            TcpClient clienteRadar = servidor.AcceptTcpClient();
-            servidor.Stop();
-
             Stopwatch sw = Stopwatch.StartNew();
 
             for (int i = 0; i < 10; i++)

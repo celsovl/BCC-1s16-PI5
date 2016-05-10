@@ -41,8 +41,15 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="GaussianRandom.cs" />
+    <Compile Include="Aviao.cs" />
+    <Compile Include="Canhao.cs" />
+    <Compile Include="Vetor.cs" />
+    <Compile Include="Trajetoria3.cs" />
+    <Compile Include="Trajetoria2.cs" />
+    <Compile Include="Trajetoria1.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Trajetoria.cs" />
+    <Compile Include="Util.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
