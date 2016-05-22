@@ -103,5 +103,47 @@ namespace Testes
             vals.Sort();
             Console.WriteLine(string.Join(", ", vals.Select(x => x.ToString("f3", CultureInfo.InvariantCulture)).ToArray()));
         }
+
+        [TestMethod]
+        public void TestTiro()
+        {
+            Tiro tiro = new Tiro(new Vetor(0, 0, 0), 0, 0.5 * Math.PI / 180, 0);
+            double t = 0;
+            while (t < 80)
+            {
+                Console.WriteLine(
+                    "{0:f2} ==> Posicao: {1}",
+                    t,
+                    tiro.PosicaoEm(t));
+
+                t += 0.5;
+            }
+        }
+
+        [TestMethod]
+        public void TestRotacao()
+        {
+            const double NOVENTA = Math.PI / 2;
+
+            Assert.AreEqual(new Vetor(0, 1, 0), new Vetor(1, 0, 0).RotateZ(NOVENTA));
+            Assert.AreEqual(new Vetor(0, 0, 1), new Vetor(1, 0, 0).RotateY(-NOVENTA));
+            Assert.AreEqual(new Vetor(0, 1, 0), new Vetor(1, 0, 0).RotateY(-NOVENTA).RotateZ(NOVENTA));
+            Assert.AreEqual(new Vetor(0, 1, 0), new Vetor(1, 0, 0).RotateZ(NOVENTA).RotateY(-NOVENTA));
+
+            Assert.AreEqual(new Vetor(-1, 0, 0), new Vetor(1, 0, 0).RotateZ(Math.PI));
+            Assert.AreEqual(new Vetor(-1, 0, 0), new Vetor(1, 0, 0).RotateY(-Math.PI));
+            Assert.AreEqual(new Vetor(1, 0, 0), new Vetor(1, 0, 0).RotateY(-Math.PI).RotateZ(Math.PI));
+            Assert.AreEqual(new Vetor(1, 0, 0), new Vetor(1, 0, 0).RotateZ(Math.PI).RotateY(-Math.PI));
+        }
+
+        [TestMethod]
+        public void TestAnguloEntre()
+        {
+            Assert.AreEqual(Math.PI / 2, new Vetor(0, 0, 1).AnguloEntre(new Vetor(1, 0, 0)));
+            Assert.AreEqual(Math.PI / 2, new Vetor(0, 0, 1).AnguloEntre(new Vetor(0, 1, 0)));
+
+            Assert.AreEqual(45 / 180.0 * Math.PI, new Vetor(1, 0, 0).AnguloEntre(new Vetor(1, 0, 0).RotateZ(45 / 180.0 * Math.PI)));
+            Assert.AreEqual(181 / 180.0 * Math.PI, new Vetor(1, 0, 0).AnguloEntre(new Vetor(1, 0, 0).RotateZ(181 / 180.0 * Math.PI)));
+        }
     }
 }

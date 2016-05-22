@@ -8,7 +8,7 @@ namespace Comum
     public class Trajetoria1 : Trajetoria
     {
         public const double ALTITUDE = 200;
-        public const double VELOCIDADEMEDIA = 240 * 3.6;
+        public const double VELOCIDADEMEDIA = 240 / 3.6;
 
         public double AnguloEntrada;
 

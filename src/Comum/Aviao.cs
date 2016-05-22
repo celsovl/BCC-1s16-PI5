@@ -24,9 +24,13 @@ namespace Comum
             var anguloEntrada = rnd.NextDouble() * 2 * Math.PI;
 
             if (rnd.NextDouble() < 0.5)
+            {
+                Console.WriteLine("Trajetoria 1");
                 Trajetoria = new Trajetoria1(alvo, anguloEntrada);
+            }
             else
             {
+                Console.WriteLine("Trajetoria 2");
                 var anguloExtra = Util.Grau2Rad(Util.Rnd(rnd.NextDouble(), -75, -10, 10, 75));
                 Trajetoria = new Trajetoria2(alvo, anguloEntrada, anguloExtra);
                 tempoParaTrocarRota = Util.RndGauss(7.5, 1, rnd.NextDouble(), rnd.NextDouble());
@@ -41,12 +45,14 @@ namespace Comum
             {
                 vaiDesistir = false;
                 tempoTroca = elapsed;
+                Console.WriteLine("Desistiu de atacar");
                 Trajetoria = new Trajetoria3(posicaoAtual, alvo);
             }
             else if (tempoParaTrocarRota > -1 && elapsed > tempoParaTrocarRota)
             {
                 tempoParaTrocarRota = -1;
                 tempoTroca = elapsed;
+                Console.WriteLine("Trajetoria 1");
                 Trajetoria = new Trajetoria1(alvo, posicaoAtual);
             }
 

@@ -43,6 +43,8 @@
   <ItemGroup>
     <Compile Include="Aviao.cs" />
     <Compile Include="Canhao.cs" />
+    <Compile Include="Pacotes.cs" />
+    <Compile Include="Tiro.cs" />
     <Compile Include="Vetor.cs" />
     <Compile Include="Trajetoria3.cs" />
     <Compile Include="Trajetoria2.cs" />

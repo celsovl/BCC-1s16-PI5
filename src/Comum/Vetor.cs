@@ -58,9 +58,9 @@ namespace Comum
 
         public static bool operator ==(Vetor p1, Vetor p2)
         {
-            return p1.X == p2.X &&
-                p1.Y == p2.Y &&
-                p1.Z == p2.Z;
+            return Math.Abs((p1.X - p2.X) +
+                (p1.Y - p2.Y) +
+                (p1.Z - p2.Z)) < 1e-9;
         }
 
         public static bool operator !=(Vetor p1, Vetor p2)
@@ -86,6 +86,11 @@ namespace Comum
         public Vetor Unit()
         {
             return this / this.Mag();
+        }
+
+        public double AnguloEntre(Vetor v)
+        {
+            return Math.Acos((this * v)/(this.Mag() * v.Mag()));
         }
 
         public Vetor To(double angulo, double raio)
@@ -119,6 +124,22 @@ namespace Comum
         public Vetor RotateZ(double angle, Vetor center)
         {
             return (this - center).RotateZ(angle) + center;
+        }
+
+        public Vetor RotateX(double angle)
+        {
+            return new Vetor(
+                this.X,
+                this.Y * Math.Cos(angle) - this.Z * Math.Sin(angle),
+                this.Y * Math.Sin(angle) + this.Z * Math.Cos(angle));
+        }
+
+        public Vetor RotateY(double angle)
+        {
+            return new Vetor(
+                this.X * Math.Cos(angle) + this.Z * Math.Sin(angle),
+                this.Y,
+                - this.X * Math.Sin(angle) + this.Z * Math.Cos(angle));
         }
 
         public Vetor RotateZ(double angle)

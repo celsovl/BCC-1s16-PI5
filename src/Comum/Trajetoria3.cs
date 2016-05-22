@@ -8,7 +8,7 @@ namespace Comum
     public class Trajetoria3 : Trajetoria
     {
         public const double ALTITUDE = 1200;
-        public const double VELOCIDADEMEDIA = 750 * 3.6;
+        public const double VELOCIDADEMEDIA = 750 / 3.6;
 
         public Trajetoria3(Vetor posicaoEntrada, Vetor posicaoSaida)
             : base(posicaoEntrada.SetZ(ALTITUDE), posicaoSaida.SetZ(ALTITUDE))
