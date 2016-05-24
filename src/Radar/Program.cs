@@ -444,15 +444,12 @@ namespace Radar
                         Vetor posicaoTiro = canhao.Tiros[i].PosicaoEm(tempo);
                         Console.WriteLine("  {0}: {1} {2}", i, posicaoTiro, (posicaoAviao - posicaoTiro).Mag());
 
-                        if ((canhao.Tiros[i].PosicaoEm(tempo) - posicaoAviao).Mag() < 2)
+                        if ((canhao.Tiros[i].PosicaoEm(tempo) - posicaoAviao).Mag() < 5)
                         {
                             aviaoAbatido = true;
                             Console.WriteLine("AVIAO ABATIDO");
 
-                            EnviarParaCliente(new Pacote(
-                                TipoPacote.AviaoAbatido,
-                                new PacotePosicao(),
-                                new PacoteTiro()).ToBytes());
+                            EnviarParaCliente(new Pacote(TipoPacote.AviaoAbatido));
 
                             sw.Stop();
                             emLoop = false;
@@ -472,10 +469,7 @@ namespace Radar
                     alvoDestruido = true;
                     Console.WriteLine("ALVO DESTRUIDO");
                     
-                    EnviarParaCliente(new Pacote(
-                        TipoPacote.AlvoDestruido, 
-                        new PacotePosicao(),
-                        new PacoteTiro()).ToBytes());
+                    EnviarParaCliente(new Pacote(TipoPacote.AlvoDestruido));
 
                     emLoop = false;
                     sw.Stop();
@@ -486,13 +480,13 @@ namespace Radar
             }
         }
 
-        private void EnviarParaCliente(byte[] buf)
+        private void EnviarParaCliente(Pacote pacote)
         {
             if (cliente != null && cliente.Connected)
             {
                 try
                 {
-                    cliente.Send(buf);
+                    cliente.Send(pacote.ToBytes());
                 }
                 catch (Exception ex)
                 {
@@ -524,15 +518,25 @@ namespace Radar
                         cliente.Receive(buf);
                         Pacote pacote = Pacote.FromBytes(buf);
 
-                        Console.WriteLine(
-                            "Tiro dado: {0:f2}, {1:f2}",
-                            pacote.Tiro.AnguloAzimute * 180 / Math.PI,
-                            pacote.Tiro.AnguloElevacao * 180 / Math.PI);
+                        if (pacote.Tipo == TipoPacote.Ping)
+                        {
+                            EnviarParaCliente(
+                                new Pacote(
+                                    TipoPacote.Pong,
+                                    pingPong: new PacotePingPong(pacote.PingPong.Tempo)));
+                        }
+                        else if (pacote.Tipo == TipoPacote.Tiro)
+                        {
+                            Console.WriteLine(
+                                "Tiro dado: {0:f2}, {1:f2}",
+                                pacote.Tiro.AnguloAzimute * 180 / Math.PI,
+                                pacote.Tiro.AnguloElevacao * 180 / Math.PI);
 
-                        canhao.Atirar(
-                            sw.Elapsed.TotalSeconds,
-                            pacote.Tiro.AnguloAzimute,
-                            pacote.Tiro.AnguloElevacao);
+                            canhao.Atirar(
+                                sw.Elapsed.TotalSeconds,
+                                pacote.Tiro.AnguloAzimute,
+                                pacote.Tiro.AnguloElevacao);
+                        }
                     }
                 }
                 else
@@ -553,16 +557,14 @@ namespace Radar
                 cliente.Close();
         }
 
-        private byte[] ObterPacotePosicaoAviao(double tempo, Vetor posicao)
+        private Pacote ObterPacotePosicaoAviao(double tempo, Vetor posicao)
         {
             return new Pacote(TipoPacote.Posicao,
-                new PacotePosicao(
+                posicao: new PacotePosicao(
                     tempo,
                     posicao.X,
                     posicao.Y,
-                    posicao.Z),
-                new PacoteTiro())
-                .ToBytes();
+                    posicao.Z));
         }
 
         public struct VertexP3N3T2

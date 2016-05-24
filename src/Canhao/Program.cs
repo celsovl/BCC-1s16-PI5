@@ -13,6 +13,7 @@ namespace Canhao
     class Program
     {
         const int PORTA = 10800;
+        const double tax = 1/10.0;
         private Vetor posicaoAlvo = new Vetor(50000, 50000, 0);
         private Vetor posicaoCanhao = new Vetor(55000, 55000, 0);
         private int tirosDisponiveis = 4;
@@ -23,6 +24,8 @@ namespace Canhao
         private Vetor posicaoAnterior;
         private Vetor velocidadeAnterior;
         private int contadorEstabilidade;
+        private int contadorIteracoes;
+        private double tempoMedioThroughput;
         private double tempoBase = 5;
         private double tempoAtraso = 0.0;
         private double dispararEm = -1;
@@ -30,7 +33,8 @@ namespace Canhao
 
         static void Main(string[] args)
         {
-            args = new string[] { "localhost" };
+            if (args.Length == 0)
+                args = new string[] { "localhost" };
 
             Program p = new Program();
             p.Rodar(args[0]);
@@ -44,7 +48,7 @@ namespace Canhao
             while (EstaConectado())
             {
                 Pacote? pacote = ReceberPacote();
-                if (pacote.HasValue)
+                while (pacote.HasValue)
                 {
                     if (pacote.Value.Tipo == TipoPacote.Posicao)
                     {
@@ -63,17 +67,38 @@ namespace Canhao
                     else if (pacote.Value.Tipo == TipoPacote.AlvoDestruido)
                     {
                         Console.WriteLine("ALVO DESTRUIDO");
-                        break;
+                        return;
                     }
                     else if (pacote.Value.Tipo == TipoPacote.AviaoAbatido)
                     {
                         Console.WriteLine("Acertamos motherf....r");
-                        break;
+                        return;
                     }
+                    else if (pacote.Value.Tipo == TipoPacote.Pong)
+                    {
+                        double dif = sw.Elapsed.TotalSeconds - pacote.Value.PingPong.Tempo;
+                        if (tempoMedioThroughput == 0)
+                            tempoMedioThroughput = dif;
+                        else
+                            tempoMedioThroughput = tax * dif + (1 - tax) * tempoMedioThroughput;
+
+                        Console.WriteLine("Throughput: {0}", tempoMedioThroughput);
+                    }
+
+                    pacote = ReceberPacote();
                 }
 
                 CalcularTiro();
                 DispararTiro();
+                
+                contadorIteracoes++;
+                if (contadorIteracoes % 30 == 0)
+                {
+                    EnviarParaCliente(
+                        new Pacote(
+                            TipoPacote.Ping, 
+                            pingPong: new PacotePingPong(sw.Elapsed.TotalSeconds)));
+                }
 
                 Thread.Sleep(100 / 6);
             }
@@ -83,7 +108,7 @@ namespace Canhao
         {
             if (dispararEm > -1 && sw.Elapsed.TotalSeconds > dispararEm)
             {
-                cliente.Client.Send(pacoteDisparo.ToBytes());
+                EnviarParaCliente(pacoteDisparo);
 
                 Console.WriteLine(
                     "Atirou => Tempo: {0}, Elevacao: {1}, Azimute: {2}",
@@ -170,11 +195,10 @@ namespace Canhao
 
                 Debug.Assert((new Tiro(posicaoCanhao, anguloAzimute, anguloElevacao, 0).PosicaoEm(tempo) - posicaoEstimada).Mag() < 1e-10);
 
-                dispararEm = sw.Elapsed.TotalSeconds + (tempoBase - tempo);
+                dispararEm = sw.Elapsed.TotalSeconds + (tempoBase - tempo - tempoMedioThroughput/2);
                 pacoteDisparo = new Pacote(
                     TipoPacote.Tiro,
-                    new PacotePosicao(),
-                    new PacoteTiro(
+                    tiro: new PacoteTiro(
                         anguloAzimute,
                         anguloElevacao));
             }
@@ -197,9 +221,25 @@ namespace Canhao
             return cliente != null && cliente.Connected;
         }
 
+        private void EnviarParaCliente(Pacote pacote)
+        {
+            if (cliente != null && cliente.Connected)
+            {
+                try
+                {
+                    cliente.Client.Send(pacote.ToBytes());
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
+            }
+        }
+
         private void ConectarSeAoRadar(string host)
         {
             cliente = new TcpClient();
+            cliente.NoDelay = true;
             while (!cliente.Connected)
             {
                 try

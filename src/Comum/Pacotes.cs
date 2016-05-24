@@ -11,7 +11,9 @@ namespace Comum
         Posicao = 1,
         Tiro,
         AlvoDestruido,
-        AviaoAbatido
+        AviaoAbatido,
+        Ping,
+        Pong
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -22,12 +24,18 @@ namespace Comum
         public TipoPacote Tipo;
         public PacotePosicao Posicao;
         public PacoteTiro Tiro;
+        public PacotePingPong PingPong;
 
-        public Pacote(TipoPacote tipo, PacotePosicao posicao, PacoteTiro tiro)
+        public Pacote(
+            TipoPacote tipo, 
+            PacotePosicao posicao = default(PacotePosicao), 
+            PacoteTiro tiro = default(PacoteTiro),
+            PacotePingPong pingPong = default(PacotePingPong))
         {
             Tipo = tipo;
             Posicao = posicao;
             Tiro = tiro;
+            PingPong = pingPong;
         }
 
         public byte[] ToBytes()
@@ -94,5 +102,16 @@ namespace Comum
 
         public double AnguloAzimute;
         public double AnguloElevacao;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PacotePingPong
+    {
+        public PacotePingPong(double tempo)
+        {
+            Tempo = tempo;
+        }
+
+        public double Tempo;
     }
 }
