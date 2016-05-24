@@ -18,12 +18,14 @@ namespace Radar
     {
         const int porta = 10800;
         const double fps = 60.0f;
+        private double tempoAnterior;
         private int curretFrame;
         private Aviao aviao;
         private Canhao canhao;
         private Vetor posicaoAlvo = new Vetor(50000, 50000, 0);
         private Vetor posicaoCanhao = new Vetor(55000, 55000, 0);
         private Vetor posicaoAviao;
+        private Vetor posicaoAviaoAnterior;
         private Stopwatch sw;
         private bool alvoDestruido;
         private bool aviaoAbatido;
@@ -435,16 +437,11 @@ namespace Radar
 
             if (!alvoDestruido && !aviaoAbatido && (posicaoAlvo - posicaoAviao).Mag() < 20000)
             {
-                double distanciaAviaoAlvo = (posicaoAviao - posicaoAlvo).Mag();
-
                 for (int i = 0; i < canhao.Tiros.Length && canhao.Tiros[i] != null; i++)
                 {
-                    if (canhao.Tiros[i].Viajando(tempo))
+                    if (canhao.Tiros[i].Viajando(tempo) || canhao.Tiros[i].Viajando(tempoAnterior))
                     {
-                        Vetor posicaoTiro = canhao.Tiros[i].PosicaoEm(tempo);
-                        Console.WriteLine("  {0}: {1} {2}", i, posicaoTiro, (posicaoAviao - posicaoTiro).Mag());
-
-                        if ((canhao.Tiros[i].PosicaoEm(tempo) - posicaoAviao).Mag() < 5)
+                        if (AbateuAviao(i, tempo, canhao.Tiros[i]))
                         {
                             aviaoAbatido = true;
                             Console.WriteLine("AVIAO ABATIDO");
@@ -457,6 +454,8 @@ namespace Radar
 
                     }
                 }
+
+                double distanciaAviaoAlvo = (posicaoAviao - posicaoAlvo).Mag();
 
                 if (distanciaAviaoAlvo < 10000 && curretFrame % ((int)fps / 4) == 0)
                 {
@@ -478,6 +477,43 @@ namespace Radar
                 tempo = sw.Elapsed.TotalSeconds;
                 posicaoAviao = aviao.PosicaoEm(tempo);
             }
+
+            tempoAnterior = tempo;
+            posicaoAviaoAnterior = posicaoAviao;
+        }
+
+        private bool AbateuAviao(int i, double tempo, Tiro tiro)
+        {
+            Vetor posicaoTiro = tiro.PosicaoEm(tempo);
+            Console.WriteLine("  {0}: {1} {2}", i, posicaoTiro, (posicaoAviao - posicaoTiro).Mag());
+
+            return (tiro.PosicaoEm(tempo) - posicaoAviao).Mag() < 5;
+        }
+
+        private bool AbateuAviao2(int i, double tempo, Tiro tiro)
+        {
+            Vetor posicaoTiro = tiro.PosicaoEm(tempo);
+            Vetor posicaoTiroAnterior = tiro.PosicaoEm(tempoAnterior);
+
+            Console.WriteLine("  {0}: {1} {2}", i, posicaoTiro, (posicaoAviao - posicaoTiro).Mag());
+
+            double m1 = (posicaoAviao.Y-posicaoAviaoAnterior.Y)/(posicaoAviao.X-posicaoAviaoAnterior.X);
+            double m2 = (posicaoTiro.Y-posicaoTiroAnterior.Y)/(posicaoTiro.X-posicaoTiroAnterior.X);
+            double b1 = posicaoAviao.Y - (m1 * posicaoAviao.X);
+            double b2 = posicaoTiro.Y - (m2 * posicaoTiro.X);
+
+            double x = (b2 - b1) / (m1 - m2);
+
+            if (Math.Abs(posicaoAviao.X - posicaoAviaoAnterior.X) >= Math.Abs(x - posicaoAviaoAnterior.X))
+            {
+                for (double t = tempoAnterior; t < tempo; t += 3/Tiro.VELOCIDADEMEDIA)
+                {
+                    if ((aviao.PosicaoEm(t) - tiro.PosicaoEm(t)).Mag() < 5)
+                        return true;
+                }
+            }
+
+            return false;
         }
 
         private void EnviarParaCliente(Pacote pacote)
