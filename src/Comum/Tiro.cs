@@ -17,7 +17,10 @@ namespace Comum
         {
             this.canhao = canhao;
             this.disparadoEm = disparadoEm;
-            velocidade = new Vetor(1, 0, 0).RotateZ(anguloAzimute).RotateY(anguloElevacao) * VELOCIDADEMEDIA;
+            velocidade = new Vetor(
+                Math.Cos(anguloElevacao) * Math.Cos(anguloAzimute),
+                Math.Cos(anguloElevacao) * Math.Sin(anguloAzimute),
+                Math.Sin(anguloElevacao)) * VELOCIDADEMEDIA;
         }
 
         public Vetor PosicaoEm(double tempo)

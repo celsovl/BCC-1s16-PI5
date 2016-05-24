@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using Comum;
 
 namespace Canhao
@@ -13,7 +14,7 @@ namespace Canhao
     {
         const int PORTA = 10800;
         private Vetor posicaoAlvo = new Vetor(50000, 50000, 0);
-        private Vetor posicaoCanhao = new Vetor(75000, 75000, 0);
+        private Vetor posicaoCanhao = new Vetor(55000, 55000, 0);
         private int tirosDisponiveis = 4;
 
         private TcpClient cliente;
@@ -23,7 +24,9 @@ namespace Canhao
         private Vetor velocidadeAnterior;
         private int contadorEstabilidade;
         private double tempoBase = 5;
-        private double tempoAtraso = 0.5;
+        private double tempoAtraso = 0.0;
+        private double dispararEm = -1;
+        private Pacote pacoteDisparo;
 
         static void Main(string[] args)
         {
@@ -56,7 +59,6 @@ namespace Canhao
                             sw.Elapsed.TotalSeconds);
 
                         CalcularTrajetoria(pacote.Value.Posicao.Tempo, posicao);
-                        DispararTiro();
                     }
                     else if (pacote.Value.Tipo == TipoPacote.AlvoDestruido)
                     {
@@ -69,6 +71,29 @@ namespace Canhao
                         break;
                     }
                 }
+
+                CalcularTiro();
+                DispararTiro();
+
+                Thread.Sleep(100 / 6);
+            }
+        }
+
+        private void DispararTiro()
+        {
+            if (dispararEm > -1 && sw.Elapsed.TotalSeconds > dispararEm)
+            {
+                cliente.Client.Send(pacoteDisparo.ToBytes());
+
+                Console.WriteLine(
+                    "Atirou => Tempo: {0}, Elevacao: {1}, Azimute: {2}",
+                    sw.Elapsed.TotalSeconds,
+                    pacoteDisparo.Tiro.AnguloElevacao * 180 / Math.PI,
+                    pacoteDisparo.Tiro.AnguloAzimute * 180 / Math.PI);
+
+                tirosDisponiveis--;
+                contadorEstabilidade = 0;
+                dispararEm = -1;
             }
         }
 
@@ -86,19 +111,20 @@ namespace Canhao
             velocidadeAnterior = dif;
         }
 
-        private void DispararTiro()
+        private void CalcularTiro()
         {
             const double GRAVIDADE = 9.80665;
 
-            if (tirosDisponiveis > 0 && contadorEstabilidade >= 20)
+            if (tirosDisponiveis > 0 && contadorEstabilidade >= 30 && dispararEm == -1)
             {
                 // projetar posicao aviao
                 Vetor posicaoEstimada = posicaoAnterior + velocidadeAnterior * tempoBase;
                 Vetor distanciaCanhaoAviao = posicaoEstimada - posicaoCanhao;
 
                 double magXY = Math.Sqrt(distanciaCanhaoAviao.X * distanciaCanhaoAviao.X + distanciaCanhaoAviao.Y * distanciaCanhaoAviao.Y);
-                double anguloAzimute = new Vetor(1,0,0).AnguloEntre(distanciaCanhaoAviao);
-                if (distanciaCanhaoAviao.X < 0)
+
+                double anguloAzimute = Math.Acos(distanciaCanhaoAviao.X / magXY);
+                if (distanciaCanhaoAviao.Y < 0)
                     anguloAzimute *= -1;
 
                 double v2 = Tiro.VELOCIDADEMEDIA * Tiro.VELOCIDADEMEDIA;
@@ -115,38 +141,42 @@ namespace Canhao
                 double anguloElevacao = anguloElevacao1;
                 double tempo = tempo1;
 
+                Console.WriteLine(Tiro.VELOCIDADEMEDIA * Math.Sin(anguloElevacao1) * tempo1 - GRAVIDADE * tempo1 * tempo1 / 2);
+                Console.WriteLine(Tiro.VELOCIDADEMEDIA * Math.Sin(anguloElevacao2) * tempo2 - GRAVIDADE * tempo2 * tempo2 / 2);
+
                 if (tempo2 < tempo1)
                 {
                     anguloElevacao = anguloElevacao2;
                     tempo = tempo2;
                 }
 
-                if (Math.Abs(tempo - tempoBase) > tempoBase * 1.1)
+                if (tempo > tempoBase)
                 {
-                    tempoBase = tempo + tempoAtraso;
+                    tempoBase = tempo + 2;
                     Console.WriteLine(
-                        "Tempo: {0}, Elevacao: {1}, Azimute: {2}",
+                        "Estimado Ruim Tempo: {0}, Elevacao: {1}, Azimute: {2}",
                         tempo,
                         anguloElevacao * 180 / Math.PI,
                         anguloAzimute * 180 / Math.PI);
+
                     return;
                 }
 
-                Console.WriteLine(
-                    "Atirou => Tempo: {0}, Elevacao: {1}, Azimute: {2}",
-                    tempo,
-                    anguloElevacao * 180 / Math.PI,
-                    anguloAzimute * 180 / Math.PI);
-
-                cliente.Client.Send(
-                    new Pacote(
-                        TipoPacote.Tiro,
-                        new PacotePosicao(),
-                        new PacoteTiro(anguloAzimute, anguloElevacao))
-                    .ToBytes());
-
-                tirosDisponiveis--;
                 contadorEstabilidade = 0;
+
+                Console.WriteLine(new Tiro(posicaoCanhao, anguloAzimute, anguloElevacao, 0).PosicaoEm(tempo));
+                Console.WriteLine(posicaoEstimada);
+                Console.WriteLine((new Tiro(posicaoCanhao, anguloAzimute, anguloElevacao, 0).PosicaoEm(tempo) - posicaoEstimada).Mag());
+
+                Debug.Assert((new Tiro(posicaoCanhao, anguloAzimute, anguloElevacao, 0).PosicaoEm(tempo) - posicaoEstimada).Mag() < 1e-10);
+
+                dispararEm = sw.Elapsed.TotalSeconds + (tempoBase - tempo);
+                pacoteDisparo = new Pacote(
+                    TipoPacote.Tiro,
+                    new PacotePosicao(),
+                    new PacoteTiro(
+                        anguloAzimute,
+                        anguloElevacao));
             }
         }
 

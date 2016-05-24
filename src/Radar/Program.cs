@@ -1,58 +1,422 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using Comum;
+using OpenTK;
+using OpenTK.Graphics.OpenGL;
 
 namespace Radar
 {
-    class Program
+    class Program : GameWindow
     {
         const int porta = 10800;
+        const double fps = 60.0f;
+        private int curretFrame;
         private Aviao aviao;
         private Canhao canhao;
-        private byte[] pacote;
         private Vetor posicaoAlvo = new Vetor(50000, 50000, 0);
-        private Vetor posicaoCanhao = new Vetor(75000, 75000, 0);
+        private Vetor posicaoCanhao = new Vetor(55000, 55000, 0);
+        private Vetor posicaoAviao;
         private Stopwatch sw;
         private bool alvoDestruido;
         private bool aviaoAbatido;
         private bool emLoop;
         private Socket cliente = null;
         private Thread threadIO;
+        private int textureChao;
+        private int textureBalaCanhao;
+        private Bitmap chaoBitmap = new Bitmap("aerial.jpg");
+        private Bitmap balaCanahaoBitmap = new Bitmap("balacanhao.jpg");
+
+        const float aceleracao = 10/180f;
+        OpenTK.Input.Key tecla;
+        DateTime? tempoInicio;
+        float angle;
+        float angle2;
+        float zoom = 500f;
 
         static void Main(string[] args)
         {
-            bool executar = true;
-
-            while (executar)
+            using (Program program = new Program())
             {
-                Program p = new Program();
-                p.Rodar();
-
-                bool ok = false;
-                while (!ok)
-                {
-                    Console.Write("\nExecutar novamente (S/n)");
-                    var read = Console.ReadKey();
-                    if (read.Key == ConsoleKey.S || read.Key == ConsoleKey.Enter)
-                        ok = true;
-                    else if (read.Key == ConsoleKey.N)
-                    {
-                        ok = true;
-                        executar = false;
-                    }
-                }
-
-                Console.WriteLine();
+                program.Title = "Radar";
+                program.Run(fps, 0.0);
             }
         }
 
-        private void Rodar()
+        protected override void OnUnload(EventArgs e)
+        {
+            GL.DeleteTextures(1, ref textureChao);
+            GL.DeleteTextures(1, ref textureBalaCanhao);
+        }
+
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+
+            GL.ClearColor(Color.BlueViolet);
+            GL.Enable(EnableCap.DepthTest);
+            GL.Enable(EnableCap.Texture2D);
+
+            GL.Hint(HintTarget.PerspectiveCorrectionHint, HintMode.Nicest);
+
+            textureChao = LoadTexture(chaoBitmap);
+            textureBalaCanhao = LoadTexture(balaCanahaoBitmap);
+
+            Iniciar();
+        }
+
+        private int LoadTexture(Bitmap bitmap)
+        {
+            int textureID;
+
+            GL.GenTextures(1, out textureID);
+            GL.BindTexture(TextureTarget.Texture2D, textureID);
+
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.GenerateMipmap, (int)All.True);
+            //GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.LinearMipmapLinear);
+            //GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.MirroredRepeat);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.MirroredRepeat);
+
+            BitmapData data = bitmap.LockBits(new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height),
+                ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+
+            GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, data.Width, data.Height, 0,
+                OpenTK.Graphics.OpenGL.PixelFormat.Bgra, PixelType.UnsignedByte, data.Scan0);
+
+            bitmap.UnlockBits(data);
+
+            return textureID;
+        }
+
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+
+            GL.Viewport(0, 0, Width, Height);
+
+            double aspect_ratio = Width / (double)Height;
+
+            Matrix4 perspective = Matrix4.CreatePerspectiveFieldOfView(MathHelper.PiOver6, (float)aspect_ratio, 1, 200000);
+            GL.MatrixMode(MatrixMode.Projection);
+            GL.LoadMatrix(ref perspective);
+        }
+
+        protected override void OnKeyDown(OpenTK.Input.KeyboardKeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+            if (!tempoInicio.HasValue)
+            {
+                tempoInicio = DateTime.Now;
+                tecla = e.Key;
+            }
+        }
+
+        protected override void OnKeyUp(OpenTK.Input.KeyboardKeyEventArgs e)
+        {
+            base.OnKeyUp(e);
+            
+            if (e.Key == tecla)
+                tempoInicio = null;
+        }
+
+        protected override void OnUpdateFrame(FrameEventArgs e)
+        {
+            base.OnUpdateFrame(e);
+
+            LoopRadar();
+
+            float tempo = (float)(DateTime.Now - (tempoInicio.HasValue ? tempoInicio : DateTime.Now).Value).TotalSeconds;
+
+            var keyboard = OpenTK.Input.Keyboard.GetState();
+            if (keyboard[OpenTK.Input.Key.Escape])
+            {
+                this.Exit();
+            }
+            else if (keyboard[OpenTK.Input.Key.Right])
+            {
+                angle += 1/180f + aceleracao * tempo;
+            }
+            else if (keyboard[OpenTK.Input.Key.Left])
+            {
+                angle -= 1/180f + aceleracao * tempo;
+            }
+            else if (keyboard[OpenTK.Input.Key.Up] && keyboard[OpenTK.Input.Key.ControlLeft])
+            {
+                zoom *= 1.1f;
+            }
+            else if (keyboard[OpenTK.Input.Key.Down] && keyboard[OpenTK.Input.Key.ControlLeft])
+            {
+                zoom /= 1.1f;
+            }
+            else if (keyboard[OpenTK.Input.Key.Up])
+            {
+                angle2 += 1/180f + aceleracao * tempo;
+            }
+            else if (keyboard[OpenTK.Input.Key.Down])
+            {
+                angle2 -= 1/180f + aceleracao * tempo;
+            }
+
+            curretFrame++;
+        }
+
+        protected override void OnRenderFrame(FrameEventArgs e)
+        {
+            base.OnRenderFrame(e);
+
+            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+            GL.MatrixMode(MatrixMode.Modelview);
+
+            //Matrix4 lookat = Matrix4.LookAt(40000, 40000, 1000, 50000, 50000, 0, 0, 0, 1);
+            Matrix4 lookat = Matrix4.LookAt(
+                (float)(posicaoAviao.X + zoom * Math.Cos(angle2) * Math.Cos(angle)),
+                (float)(posicaoAviao.Y + zoom * Math.Cos(angle2) * Math.Sin(angle)), 
+                (float)(posicaoAviao.Z + zoom * Math.Sin(angle2)),
+                (float)posicaoAviao.X,
+                (float)posicaoAviao.Y,
+                (float)posicaoAviao.Z,
+                0, 0, 1);
+            GL.LoadMatrix(ref lookat);
+
+            DrawBackground();
+
+            //GL.Translate(-posicaoAviao.X, -posicaoAviao.Y, -posicaoAviao.Z);
+            //GL.Rotate(angle2, 0.0f, 1.0f, 0.0f);
+            //GL.Rotate(angle, 0.0f, 0.0f, 1.0f);
+            //GL.Scale(zoom, zoom, zoom);
+            //GL.Translate(posicaoAviao.X, posicaoAviao.Y, posicaoAviao.Z);
+
+            DrawScene();
+
+            this.SwapBuffers();
+        }
+
+        private void DrawBackground()
+        {
+        }
+
+        private void DrawScene()
+        {
+            DrawChao();
+            DrawAlvo();
+            DrawCanhao();
+            DrawAviao();
+            DrawTiros();
+        }
+
+        private void DrawTiros()
+        {
+            for (int i = 0; i < canhao.Tiros.Length - canhao.TirosRestantes; i++)
+            {
+                if (canhao.Tiros[i].Viajando(sw.Elapsed.TotalSeconds))
+                {
+                    var posicao = canhao.Tiros[i].PosicaoEm(sw.Elapsed.TotalSeconds);
+                    GL.PushMatrix();
+                    GL.Translate(posicao.X, posicao.Y, posicao.Z);
+                    GL.BindTexture(TextureTarget.Texture2D, textureBalaCanhao);
+
+                    var vertices = CalculateVertices(50, 50, 50, 50);
+                    var elements = CalculateElements(50, 50, 50, 50);
+
+                    GL.Begin(PrimitiveType.Triangles);
+                    GL.Color3(Color.Orange);
+                    foreach (var element in elements)
+                    {
+                        var vertex = vertices[element];
+                        GL.TexCoord2(vertex.TexCoord);
+                        GL.Normal3(vertex.Normal);
+                        GL.Vertex3(vertex.Position);
+                    }
+                    GL.End();
+                    GL.PopMatrix();
+                }
+            }
+        }
+
+        private void DrawAviao()
+        {
+            GL.PushMatrix();
+
+            GL.Translate(posicaoAviao.X, posicaoAviao.Y, posicaoAviao.Z);
+            GL.Scale(200, 50, 50);
+
+            GL.Begin(PrimitiveType.Quads);
+
+            GL.Color3(Color.Silver);
+            GL.Vertex3(-1.0f, -1.0f, -1.0f);
+            GL.Vertex3(-1.0f, 1.0f, -1.0f);
+            GL.Vertex3(1.0f, 1.0f, -1.0f);
+            GL.Vertex3(1.0f, -1.0f, -1.0f);
+
+            GL.Color3(Color.Honeydew);
+            GL.Vertex3(-1.0f, -1.0f, -1.0f);
+            GL.Vertex3(1.0f, -1.0f, -1.0f);
+            GL.Vertex3(1.0f, -1.0f, 1.0f);
+            GL.Vertex3(-1.0f, -1.0f, 1.0f);
+
+            GL.Color3(Color.Moccasin);
+
+            GL.Vertex3(-1.0f, -1.0f, -1.0f);
+            GL.Vertex3(-1.0f, -1.0f, 1.0f);
+            GL.Vertex3(-1.0f, 1.0f, 1.0f);
+            GL.Vertex3(-1.0f, 1.0f, -1.0f);
+
+            GL.Color3(Color.IndianRed);
+            GL.Vertex3(-1.0f, -1.0f, 1.0f);
+            GL.Vertex3(1.0f, -1.0f, 1.0f);
+            GL.Vertex3(1.0f, 1.0f, 1.0f);
+            GL.Vertex3(-1.0f, 1.0f, 1.0f);
+
+            GL.Color3(Color.PaleVioletRed);
+            GL.Vertex3(-1.0f, 1.0f, -1.0f);
+            GL.Vertex3(-1.0f, 1.0f, 1.0f);
+            GL.Vertex3(1.0f, 1.0f, 1.0f);
+            GL.Vertex3(1.0f, 1.0f, -1.0f);
+
+            GL.Color3(Color.ForestGreen);
+            GL.Vertex3(1.0f, -1.0f, -1.0f);
+            GL.Vertex3(1.0f, 1.0f, -1.0f);
+            GL.Vertex3(1.0f, 1.0f, 1.0f);
+            GL.Vertex3(1.0f, -1.0f, 1.0f);
+
+            GL.End();
+
+            GL.PopMatrix();
+        }
+
+        private void DrawCanhao()
+        {
+            DrawCubo(posicaoCanhao + new Vetor(0,0,10), new Vetor(100, 100, 300), textureBalaCanhao);
+        }
+
+        private void DrawAlvo()
+        {
+            GL.PushMatrix();
+
+            GL.Translate(posicaoAlvo.X, posicaoAlvo.Y, posicaoAlvo.Z);
+            GL.Scale(500, 500, 1000);
+
+            GL.Begin(PrimitiveType.Quads);
+
+            GL.Color3(Color.Red);
+            GL.Vertex3(-1.0f, -1.0f, 0.0f);
+            GL.Vertex3(-1.0f, 1.0f, 0.0f);
+            GL.Color3(Color.Blue);
+            GL.Vertex3(1.0f, 1.0f, 0.0f);
+            GL.Vertex3(1.0f, -1.0f, 0.0f);
+
+            GL.Color3(Color.Red);
+            GL.Vertex3(-1.0f, -1.0f, 0.0f);
+            GL.Vertex3(1.0f, -1.0f, 0.0f);
+            GL.Color3(Color.Blue);
+            GL.Vertex3(1.0f, -1.0f, 1.0f);
+            GL.Vertex3(-1.0f, -1.0f, 1.0f);
+
+            GL.Color3(Color.Red);
+            GL.Vertex3(-1.0f, -1.0f, 0.0f);
+            GL.Vertex3(-1.0f, -1.0f, 1.0f);
+            GL.Color3(Color.Blue);
+            GL.Vertex3(-1.0f, 1.0f, 1.0f);
+            GL.Vertex3(-1.0f, 1.0f, 0.0f);
+
+            GL.Color3(Color.Red);
+            GL.Vertex3(-1.0f, -1.0f, 1.0f);
+            GL.Vertex3(1.0f, -1.0f, 1.0f);
+            GL.Color3(Color.Blue);
+            GL.Vertex3(1.0f, 1.0f, 1.0f);
+            GL.Vertex3(-1.0f, 1.0f, 1.0f);
+
+            GL.Color3(Color.Red);
+            GL.Vertex3(-1.0f, 1.0f, 0.0f);
+            GL.Vertex3(-1.0f, 1.0f, 1.0f);
+            GL.Color3(Color.Blue);
+            GL.Vertex3(1.0f, 1.0f, 1.0f);
+            GL.Vertex3(1.0f, 1.0f, 0.0f);
+
+            GL.Color3(Color.Red);
+            GL.Vertex3(1.0f, -1.0f, 0.0f);
+            GL.Vertex3(1.0f, 1.0f, 0.0f);
+            GL.Color3(Color.Blue);
+            GL.Vertex3(1.0f, 1.0f, 1.0f);
+            GL.Vertex3(1.0f, -1.0f, 1.0f);
+
+            GL.End();
+
+            GL.PopMatrix();
+        }
+
+        private void DrawCubo(Vetor posicao, Vetor escala, int textureID, double textureScale = 1.0)
+        {
+            GL.PushMatrix();
+
+            GL.Translate(posicao.X, posicao.Y, posicao.Z);
+            GL.Scale(escala.X, escala.Y, escala.Z);
+
+            GL.BindTexture(TextureTarget.Texture2D, textureID);
+
+            GL.Begin(PrimitiveType.Quads);
+            GL.Color3(Color.White);
+            GL.TexCoord2(0.0f, textureScale * 1.0f);                    GL.Vertex3(-1.0f, -1.0f, 0.0f);
+            GL.TexCoord2(textureScale * 1.0f, textureScale * 1.0f);     GL.Vertex3(-1.0f, 1.0f, 0.0f);
+            GL.TexCoord2(textureScale * 1.0f, 0.0f);                    GL.Vertex3(1.0f, 1.0f, 0.0f);
+            GL.TexCoord2(0.0f, 0.0f);                                   GL.Vertex3(1.0f, -1.0f, 0.0f);
+
+            GL.TexCoord2(0.0f, textureScale * 1.0f);                    GL.Vertex3(-1.0f, -1.0f, 0.0f);
+            GL.TexCoord2(textureScale * 1.0f, textureScale * 1.0f);     GL.Vertex3(1.0f, -1.0f, 0.0f);
+            GL.TexCoord2(textureScale * 1.0f, 0.0f);                    GL.Vertex3(1.0f, -1.0f, 1.0f);
+            GL.TexCoord2(0.0f, 0.0f);                                   GL.Vertex3(-1.0f, -1.0f, 1.0f);
+
+            GL.TexCoord2(0.0f, textureScale * 1.0f); GL.Vertex3(-1.0f, -1.0f, 0.0f);
+            GL.TexCoord2(textureScale * 1.0f, textureScale * 1.0f); GL.Vertex3(-1.0f, -1.0f, 1.0f);
+            GL.TexCoord2(textureScale * 1.0f, 0.0f); GL.Vertex3(-1.0f, 1.0f, 1.0f);
+            GL.TexCoord2(0.0f, 0.0f); GL.Vertex3(-1.0f, 1.0f, 0.0f);
+
+            GL.TexCoord2(0.0f, textureScale * 1.0f); GL.Vertex3(-1.0f, -1.0f, 1.0f);
+            GL.TexCoord2(textureScale * 1.0f, textureScale * 1.0f); GL.Vertex3(1.0f, -1.0f, 1.0f);
+            GL.TexCoord2(textureScale * 1.0f, 0.0f); GL.Vertex3(1.0f, 1.0f, 1.0f);
+            GL.TexCoord2(0.0f, 0.0f); GL.Vertex3(-1.0f, 1.0f, 1.0f);
+
+            GL.TexCoord2(0.0f, textureScale * 1.0f); GL.Vertex3(-1.0f, 1.0f, 0.0f);
+            GL.TexCoord2(textureScale * 1.0f, textureScale * 1.0f); GL.Vertex3(-1.0f, 1.0f, 1.0f);
+            GL.TexCoord2(textureScale * 1.0f, 0.0f); GL.Vertex3(1.0f, 1.0f, 1.0f);
+            GL.TexCoord2(0.0f, 0.0f); GL.Vertex3(1.0f, 1.0f, 0.0f);
+
+            GL.TexCoord2(0.0f, textureScale * 1.0f); GL.Vertex3(1.0f, -1.0f, 0.0f);
+            GL.TexCoord2(textureScale * 1.0f, textureScale * 1.0f); GL.Vertex3(1.0f, 1.0f, 0.0f);
+            GL.TexCoord2(textureScale * 1.0f, 0.0f); GL.Vertex3(1.0f, 1.0f, 1.0f);
+            GL.TexCoord2(0.0f, 0.0f); GL.Vertex3(1.0f, -1.0f, 1.0f);
+
+            GL.End();
+
+            GL.PopMatrix();
+        }
+
+        private void DrawChao()
+        {
+            GL.PushMatrix();
+            GL.BindTexture(TextureTarget.Texture2D, textureChao);
+
+            GL.Begin(PrimitiveType.Quads);
+            GL.Color3(Color.White);
+            GL.TexCoord2(0.0f, 200.0f); GL.Vertex3(0.0f, 0.0f, 0.0f);
+            GL.TexCoord2(200.0f, 200.0f); GL.Vertex3(0.0f, 100000.0f, 0.0f);
+            GL.TexCoord2(200.0f, 0.0f); GL.Vertex3(100000.0f, 100000.0f, 0.0f);
+            GL.TexCoord2(0.0f, 0.0f); GL.Vertex3(100000.0f, 0.0f, 0.0f);
+            GL.End();
+            GL.PopMatrix();
+        }
+
+        private void Iniciar()
         {
             IniciarThreadIO();
             aviao = new Aviao();
@@ -62,33 +426,48 @@ namespace Radar
             canhao.Iniciar();
 
             sw = Stopwatch.StartNew();
-            LoopRadar();
         }
 
         private void LoopRadar()
         {
             double tempo = sw.Elapsed.TotalSeconds;
-            Vetor posicaoAviao = aviao.PosicaoEm(tempo);
+            posicaoAviao = aviao.PosicaoEm(tempo);
 
-            while (!alvoDestruido && !aviaoAbatido && (posicaoAlvo - posicaoAviao).Mag() < 20000)
+            if (!alvoDestruido && !aviaoAbatido && (posicaoAlvo - posicaoAviao).Mag() < 20000)
             {
                 double distanciaAviaoAlvo = (posicaoAviao - posicaoAlvo).Mag();
-                if (distanciaAviaoAlvo < 10000)
-                {
-                    EnviarParaCliente(ObterPacotePosicaoAviao(tempo, posicaoAviao));
-                    Console.WriteLine("{0}: {1}", tempo, posicaoAviao);
 
-                    for (int i = 0; i < canhao.Tiros.Length && canhao.Tiros[i] != null; i++)
+                for (int i = 0; i < canhao.Tiros.Length && canhao.Tiros[i] != null; i++)
+                {
+                    if (canhao.Tiros[i].Viajando(tempo))
                     {
-                        if (canhao.Tiros[i].Viajando(tempo))
+                        Vetor posicaoTiro = canhao.Tiros[i].PosicaoEm(tempo);
+                        Console.WriteLine("  {0}: {1} {2}", i, posicaoTiro, (posicaoAviao - posicaoTiro).Mag());
+
+                        if ((canhao.Tiros[i].PosicaoEm(tempo) - posicaoAviao).Mag() < 2)
                         {
-                            Vetor posicaoTiro = canhao.Tiros[i].PosicaoEm(tempo);
-                            Console.WriteLine("  {0}: {1} {2}", i, posicaoTiro, (posicaoAviao - posicaoTiro).Mag());
+                            aviaoAbatido = true;
+                            Console.WriteLine("AVIAO ABATIDO");
+
+                            EnviarParaCliente(new Pacote(
+                                TipoPacote.AviaoAbatido,
+                                new PacotePosicao(),
+                                new PacoteTiro()).ToBytes());
+
+                            sw.Stop();
+                            emLoop = false;
                         }
+
                     }
                 }
 
-                if (distanciaAviaoAlvo < 1000)
+                if (distanciaAviaoAlvo < 10000 && curretFrame % ((int)fps / 4) == 0)
+                {
+                    EnviarParaCliente(ObterPacotePosicaoAviao(tempo, posicaoAviao));
+                    Console.WriteLine("{0}: {1}", tempo, posicaoAviao);
+                }
+
+                if (distanciaAviaoAlvo < 1000 && curretFrame % ((int)fps / 4) == 0)
                 {
                     alvoDestruido = true;
                     Console.WriteLine("ALVO DESTRUIDO");
@@ -97,17 +476,14 @@ namespace Radar
                         TipoPacote.AlvoDestruido, 
                         new PacotePosicao(),
                         new PacoteTiro()).ToBytes());
-                }
-                else
-                {
-                    Thread.Sleep(1000 / 4);
+
+                    emLoop = false;
+                    sw.Stop();
                 }
 
                 tempo = sw.Elapsed.TotalSeconds;
                 posicaoAviao = aviao.PosicaoEm(tempo);
             }
-
-            emLoop = false;
         }
 
         private void EnviarParaCliente(byte[] buf)
@@ -187,6 +563,77 @@ namespace Radar
                     posicao.Z),
                 new PacoteTiro())
                 .ToBytes();
+        }
+
+        public struct VertexP3N3T2
+        {
+            public Vector3 Position;
+            public Vector3 Normal;
+            public Vector2 TexCoord;
+        }
+
+        static VertexP3N3T2[] CalculateVertices(float radius, float height, byte segments, byte rings)
+        {
+            var data = new VertexP3N3T2[segments * rings];
+
+            int i = 0;
+
+            for (double y = 0; y < rings; y++)
+            {
+                double phi = (y / (rings - 1)) * Math.PI / 2;
+                for (double x = 0; x < segments; x++)
+                {
+                    double theta = (x / (segments - 1)) * 2 * Math.PI;
+
+                    Vector3 v = new Vector3()
+                    {
+                        X = (float)(radius * Math.Sin(phi) * Math.Cos(theta)),
+                        Y = (float)(height * Math.Cos(phi)),
+                        Z = (float)(radius * Math.Sin(phi) * Math.Sin(theta)),
+                    };
+                    Vector3 n = Vector3.Normalize(v);
+                    Vector2 uv = new Vector2()
+                    {
+                        X = (float)(x / (segments - 1)),
+                        Y = (float)(y / (rings - 1))
+                    };
+                    // Using data[i++] causes i to be incremented multiple times in Mono 2.2 (bug #479506).
+                    data[i] = new VertexP3N3T2() { Position = v, Normal = n, TexCoord = uv };
+                    i++;
+                }
+
+            }
+
+            return data;
+        }
+
+        static ushort[] CalculateElements(float radius, float height, byte segments, byte rings)
+        {
+            var num_vertices = segments * rings;
+            var data = new ushort[num_vertices * 6];
+
+            ushort i = 0;
+
+            for (byte y = 0; y < rings - 1; y++)
+            {
+                for (byte x = 0; x < segments - 1; x++)
+                {
+                    data[i++] = (ushort)((y + 0) * segments + x);
+                    data[i++] = (ushort)((y + 1) * segments + x);
+                    data[i++] = (ushort)((y + 1) * segments + x + 1);
+
+                    data[i++] = (ushort)((y + 1) * segments + x + 1);
+                    data[i++] = (ushort)((y + 0) * segments + x + 1);
+                    data[i++] = (ushort)((y + 0) * segments + x);
+                }
+            }
+
+            // Verify that we don't access any vertices out of bounds:
+            foreach (int index in data)
+                if (index >= segments * rings)
+                    throw new IndexOutOfRangeException();
+
+            return data;
         }
     }
 }
