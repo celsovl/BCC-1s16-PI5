@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -34,8 +35,12 @@ namespace Radar
         private Thread threadIO;
         private int textureChao;
         private int textureBalaCanhao;
-        private Bitmap chaoBitmap = new Bitmap("aerial.jpg");
+        private Bitmap chaoBitmap = new Bitmap("grass2.jpg");
         private Bitmap balaCanahaoBitmap = new Bitmap("balacanhao.jpg");
+
+        private Model3D modeloAlvo;
+        private Model3D modeloAviao;
+        private Model3D modeloTiro;
 
         const float aceleracao = 10/180f;
         OpenTK.Input.Key tecla;
@@ -46,6 +51,8 @@ namespace Radar
 
         static void Main(string[] args)
         {
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+
             using (Program program = new Program())
             {
                 program.Title = "Radar";
@@ -56,7 +63,6 @@ namespace Radar
         protected override void OnUnload(EventArgs e)
         {
             GL.DeleteTextures(1, ref textureChao);
-            GL.DeleteTextures(1, ref textureBalaCanhao);
         }
 
         protected override void OnLoad(EventArgs e)
@@ -65,12 +71,38 @@ namespace Radar
 
             GL.ClearColor(Color.BlueViolet);
             GL.Enable(EnableCap.DepthTest);
+            GL.Enable(EnableCap.ColorMaterial);
+            GL.Enable(EnableCap.Lighting);
+            GL.Enable(EnableCap.Light0);
+            GL.Enable(EnableCap.Normalize);
             GL.Enable(EnableCap.Texture2D);
 
+            GL.ShadeModel(ShadingModel.Smooth);
+            GL.Light(LightName.Light0, LightParameter.Position, new float[] { (float)posicaoAlvo.X, (float)posicaoAlvo.Y, 10000 });
+
+            GL.Light(LightName.Light0, LightParameter.Ambient, new float[] { 0.2f, 0.2f, 0.0f, 1.0f });
+            GL.Light(LightName.Light0, LightParameter.Diffuse, new float[] { 1.0f, 1.0f, 1.0f, 1.0f });
+            GL.Light(LightName.Light0, LightParameter.Specular, new float[] { 1.0f, 1.0f, 1.0f, 1.0f });
+
+            GL.Material(MaterialFace.Front, MaterialParameter.Specular, new float[] { 1, 1, 1, 1 });
+            GL.Material(MaterialFace.Front, MaterialParameter.Shininess, new float[] { 70 });
+            GL.ColorMaterial(MaterialFace.Front, ColorMaterialParameter.AmbientAndDiffuse);
             GL.Hint(HintTarget.PerspectiveCorrectionHint, HintMode.Nicest);
 
+            modeloAlvo = Model3D.FromFile("Castle.obj");
+            modeloAlvo.Texture = new Model3DTexture2D("tower.jpg");
+            modeloAlvo.Translate = new float[] { (float)posicaoAlvo.X, (float)posicaoAlvo.Y, (float)posicaoAlvo.Z + 1 };
+            modeloAlvo.Scale = new float[] { 1000, 1000, 1000 };
+
+            modeloAviao = Model3D.FromFile("Airplane HORNET.obj");
+            modeloAviao.Texture = new Model3DTexture2D("aviao2.jpg");
+            modeloAviao.Scale = new float[] { 100, 100, 100 };
+
+            modeloTiro = Model3D.FromFile("ball.obj");
+            modeloTiro.Texture = new Model3DTexture2D("balacanhao.jpg");
+            modeloTiro.Scale = new float[] { 50, 50, 50 };
+
             textureChao = LoadTexture(chaoBitmap);
-            textureBalaCanhao = LoadTexture(balaCanahaoBitmap);
 
             Iniciar();
         }
@@ -191,13 +223,6 @@ namespace Radar
             GL.LoadMatrix(ref lookat);
 
             DrawBackground();
-
-            //GL.Translate(-posicaoAviao.X, -posicaoAviao.Y, -posicaoAviao.Z);
-            //GL.Rotate(angle2, 0.0f, 1.0f, 0.0f);
-            //GL.Rotate(angle, 0.0f, 0.0f, 1.0f);
-            //GL.Scale(zoom, zoom, zoom);
-            //GL.Translate(posicaoAviao.X, posicaoAviao.Y, posicaoAviao.Z);
-
             DrawScene();
 
             this.SwapBuffers();
@@ -223,77 +248,24 @@ namespace Radar
                 if (canhao.Tiros[i].Viajando(sw.Elapsed.TotalSeconds))
                 {
                     var posicao = canhao.Tiros[i].PosicaoEm(sw.Elapsed.TotalSeconds);
-                    GL.PushMatrix();
-                    GL.Translate(posicao.X, posicao.Y, posicao.Z);
-                    GL.BindTexture(TextureTarget.Texture2D, textureBalaCanhao);
-
-                    var vertices = CalculateVertices(50, 50, 50, 50);
-                    var elements = CalculateElements(50, 50, 50, 50);
-
-                    GL.Begin(PrimitiveType.Triangles);
-                    GL.Color3(Color.Orange);
-                    foreach (var element in elements)
-                    {
-                        var vertex = vertices[element];
-                        GL.TexCoord2(vertex.TexCoord);
-                        GL.Normal3(vertex.Normal);
-                        GL.Vertex3(vertex.Position);
-                    }
-                    GL.End();
-                    GL.PopMatrix();
+                    modeloTiro.Translate = new float[] { (float)posicao.X, (float)posicao.Y, (float)posicao.Z };
+                    modeloTiro.Draw();
                 }
             }
         }
 
         private void DrawAviao()
         {
-            GL.PushMatrix();
+            Vetor velocidade = aviao.Trajetoria.Velociade;
+            double magXY = Math.Sqrt(velocidade.X * velocidade.X + velocidade.Y * velocidade.Y);
 
-            GL.Translate(posicaoAviao.X, posicaoAviao.Y, posicaoAviao.Z);
-            GL.Scale(200, 50, 50);
+            double anguloAzimute = Math.Acos(velocidade.X / magXY);
+            if (velocidade.Y < 0)
+                anguloAzimute *= -1;
 
-            GL.Begin(PrimitiveType.Quads);
-
-            GL.Color3(Color.Silver);
-            GL.Vertex3(-1.0f, -1.0f, -1.0f);
-            GL.Vertex3(-1.0f, 1.0f, -1.0f);
-            GL.Vertex3(1.0f, 1.0f, -1.0f);
-            GL.Vertex3(1.0f, -1.0f, -1.0f);
-
-            GL.Color3(Color.Honeydew);
-            GL.Vertex3(-1.0f, -1.0f, -1.0f);
-            GL.Vertex3(1.0f, -1.0f, -1.0f);
-            GL.Vertex3(1.0f, -1.0f, 1.0f);
-            GL.Vertex3(-1.0f, -1.0f, 1.0f);
-
-            GL.Color3(Color.Moccasin);
-
-            GL.Vertex3(-1.0f, -1.0f, -1.0f);
-            GL.Vertex3(-1.0f, -1.0f, 1.0f);
-            GL.Vertex3(-1.0f, 1.0f, 1.0f);
-            GL.Vertex3(-1.0f, 1.0f, -1.0f);
-
-            GL.Color3(Color.IndianRed);
-            GL.Vertex3(-1.0f, -1.0f, 1.0f);
-            GL.Vertex3(1.0f, -1.0f, 1.0f);
-            GL.Vertex3(1.0f, 1.0f, 1.0f);
-            GL.Vertex3(-1.0f, 1.0f, 1.0f);
-
-            GL.Color3(Color.PaleVioletRed);
-            GL.Vertex3(-1.0f, 1.0f, -1.0f);
-            GL.Vertex3(-1.0f, 1.0f, 1.0f);
-            GL.Vertex3(1.0f, 1.0f, 1.0f);
-            GL.Vertex3(1.0f, 1.0f, -1.0f);
-
-            GL.Color3(Color.ForestGreen);
-            GL.Vertex3(1.0f, -1.0f, -1.0f);
-            GL.Vertex3(1.0f, 1.0f, -1.0f);
-            GL.Vertex3(1.0f, 1.0f, 1.0f);
-            GL.Vertex3(1.0f, -1.0f, 1.0f);
-
-            GL.End();
-
-            GL.PopMatrix();
+            modeloAviao.Translate = new float[] { (float)posicaoAviao.X, (float)posicaoAviao.Y, (float)posicaoAviao.Z };
+            modeloAviao.Rotate = new float[] { 0, 0, (float)(90 + anguloAzimute * 180 / Math.PI) };
+            modeloAviao.Draw();
         }
 
         private void DrawCanhao()
@@ -303,58 +275,7 @@ namespace Radar
 
         private void DrawAlvo()
         {
-            GL.PushMatrix();
-
-            GL.Translate(posicaoAlvo.X, posicaoAlvo.Y, posicaoAlvo.Z);
-            GL.Scale(500, 500, 1000);
-
-            GL.Begin(PrimitiveType.Quads);
-
-            GL.Color3(Color.Red);
-            GL.Vertex3(-1.0f, -1.0f, 0.0f);
-            GL.Vertex3(-1.0f, 1.0f, 0.0f);
-            GL.Color3(Color.Blue);
-            GL.Vertex3(1.0f, 1.0f, 0.0f);
-            GL.Vertex3(1.0f, -1.0f, 0.0f);
-
-            GL.Color3(Color.Red);
-            GL.Vertex3(-1.0f, -1.0f, 0.0f);
-            GL.Vertex3(1.0f, -1.0f, 0.0f);
-            GL.Color3(Color.Blue);
-            GL.Vertex3(1.0f, -1.0f, 1.0f);
-            GL.Vertex3(-1.0f, -1.0f, 1.0f);
-
-            GL.Color3(Color.Red);
-            GL.Vertex3(-1.0f, -1.0f, 0.0f);
-            GL.Vertex3(-1.0f, -1.0f, 1.0f);
-            GL.Color3(Color.Blue);
-            GL.Vertex3(-1.0f, 1.0f, 1.0f);
-            GL.Vertex3(-1.0f, 1.0f, 0.0f);
-
-            GL.Color3(Color.Red);
-            GL.Vertex3(-1.0f, -1.0f, 1.0f);
-            GL.Vertex3(1.0f, -1.0f, 1.0f);
-            GL.Color3(Color.Blue);
-            GL.Vertex3(1.0f, 1.0f, 1.0f);
-            GL.Vertex3(-1.0f, 1.0f, 1.0f);
-
-            GL.Color3(Color.Red);
-            GL.Vertex3(-1.0f, 1.0f, 0.0f);
-            GL.Vertex3(-1.0f, 1.0f, 1.0f);
-            GL.Color3(Color.Blue);
-            GL.Vertex3(1.0f, 1.0f, 1.0f);
-            GL.Vertex3(1.0f, 1.0f, 0.0f);
-
-            GL.Color3(Color.Red);
-            GL.Vertex3(1.0f, -1.0f, 0.0f);
-            GL.Vertex3(1.0f, 1.0f, 0.0f);
-            GL.Color3(Color.Blue);
-            GL.Vertex3(1.0f, 1.0f, 1.0f);
-            GL.Vertex3(1.0f, -1.0f, 1.0f);
-
-            GL.End();
-
-            GL.PopMatrix();
+            modeloAlvo.Draw();
         }
 
         private void DrawCubo(Vetor posicao, Vetor escala, int textureID, double textureScale = 1.0)
@@ -487,7 +408,7 @@ namespace Radar
             Vetor posicaoTiro = tiro.PosicaoEm(tempo);
             Console.WriteLine("  {0}: {1} {2}", i, posicaoTiro, (posicaoAviao - posicaoTiro).Mag());
 
-            return (tiro.PosicaoEm(tempo) - posicaoAviao).Mag() < 5;
+            return (tiro.PosicaoEm(tempo) - posicaoAviao).Mag() < 7;
         }
 
         private bool AbateuAviao2(int i, double tempo, Tiro tiro)
@@ -601,77 +522,6 @@ namespace Radar
                     posicao.X,
                     posicao.Y,
                     posicao.Z));
-        }
-
-        public struct VertexP3N3T2
-        {
-            public Vector3 Position;
-            public Vector3 Normal;
-            public Vector2 TexCoord;
-        }
-
-        static VertexP3N3T2[] CalculateVertices(float radius, float height, byte segments, byte rings)
-        {
-            var data = new VertexP3N3T2[segments * rings];
-
-            int i = 0;
-
-            for (double y = 0; y < rings; y++)
-            {
-                double phi = (y / (rings - 1)) * Math.PI / 2;
-                for (double x = 0; x < segments; x++)
-                {
-                    double theta = (x / (segments - 1)) * 2 * Math.PI;
-
-                    Vector3 v = new Vector3()
-                    {
-                        X = (float)(radius * Math.Sin(phi) * Math.Cos(theta)),
-                        Y = (float)(height * Math.Cos(phi)),
-                        Z = (float)(radius * Math.Sin(phi) * Math.Sin(theta)),
-                    };
-                    Vector3 n = Vector3.Normalize(v);
-                    Vector2 uv = new Vector2()
-                    {
-                        X = (float)(x / (segments - 1)),
-                        Y = (float)(y / (rings - 1))
-                    };
-                    // Using data[i++] causes i to be incremented multiple times in Mono 2.2 (bug #479506).
-                    data[i] = new VertexP3N3T2() { Position = v, Normal = n, TexCoord = uv };
-                    i++;
-                }
-
-            }
-
-            return data;
-        }
-
-        static ushort[] CalculateElements(float radius, float height, byte segments, byte rings)
-        {
-            var num_vertices = segments * rings;
-            var data = new ushort[num_vertices * 6];
-
-            ushort i = 0;
-
-            for (byte y = 0; y < rings - 1; y++)
-            {
-                for (byte x = 0; x < segments - 1; x++)
-                {
-                    data[i++] = (ushort)((y + 0) * segments + x);
-                    data[i++] = (ushort)((y + 1) * segments + x);
-                    data[i++] = (ushort)((y + 1) * segments + x + 1);
-
-                    data[i++] = (ushort)((y + 1) * segments + x + 1);
-                    data[i++] = (ushort)((y + 0) * segments + x + 1);
-                    data[i++] = (ushort)((y + 0) * segments + x);
-                }
-            }
-
-            // Verify that we don't access any vertices out of bounds:
-            foreach (int index in data)
-                if (index >= segments * rings)
-                    throw new IndexOutOfRangeException();
-
-            return data;
         }
     }
 }
