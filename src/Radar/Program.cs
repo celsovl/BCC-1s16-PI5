@@ -66,7 +66,7 @@ namespace Radar
         {
             base.OnLoad(e);
 
-            GL.ClearColor(Color.BlueViolet);
+            GL.ClearColor(Color.LightBlue);
             GL.Enable(EnableCap.DepthTest);
             GL.Enable(EnableCap.ColorMaterial);
             GL.Enable(EnableCap.Lighting);
@@ -121,7 +121,7 @@ namespace Radar
 
             double aspect_ratio = Width / (double)Height;
 
-            Matrix4 perspective = Matrix4.CreatePerspectiveFieldOfView(MathHelper.PiOver6, (float)aspect_ratio, 1, 200000);
+            Matrix4 perspective = Matrix4.CreatePerspectiveFieldOfView(MathHelper.PiOver6, (float)aspect_ratio, 1, int.MaxValue);
             GL.MatrixMode(MatrixMode.Projection);
             GL.LoadMatrix(ref perspective);
         }
@@ -193,7 +193,6 @@ namespace Radar
 
             GL.MatrixMode(MatrixMode.Modelview);
 
-            //Matrix4 lookat = Matrix4.LookAt(40000, 40000, 1000, 50000, 50000, 0, 0, 0, 1);
             Matrix4 lookat = Matrix4.LookAt(
                 (float)(posicaoAviao.X + zoom * Math.Cos(angle2) * Math.Cos(angle)),
                 (float)(posicaoAviao.Y + zoom * Math.Cos(angle2) * Math.Sin(angle)), 
@@ -253,7 +252,6 @@ namespace Radar
         private void DrawCanhao()
         {
             modeloCanhao.Draw();
-            //DrawCubo(posicaoCanhao + new Vetor(0, 0, 10), new Vetor(100, 100, 300), textureChao);
         }
 
         private void DrawAlvo()
@@ -261,68 +259,9 @@ namespace Radar
             modeloAlvo.Draw();
         }
 
-        private void DrawCubo(Vetor posicao, Vetor escala, int textureID, double textureScale = 1.0)
-        {
-            GL.PushMatrix();
-
-            GL.Translate(posicao.X, posicao.Y, posicao.Z);
-            GL.Scale(escala.X, escala.Y, escala.Z);
-
-            GL.BindTexture(TextureTarget.Texture2D, textureID);
-
-            GL.Begin(PrimitiveType.Quads);
-            GL.Color3(Color.White);
-            GL.TexCoord2(0.0f, textureScale * 1.0f);                    GL.Vertex3(-1.0f, -1.0f, 0.0f);
-            GL.TexCoord2(textureScale * 1.0f, textureScale * 1.0f);     GL.Vertex3(-1.0f, 1.0f, 0.0f);
-            GL.TexCoord2(textureScale * 1.0f, 0.0f);                    GL.Vertex3(1.0f, 1.0f, 0.0f);
-            GL.TexCoord2(0.0f, 0.0f);                                   GL.Vertex3(1.0f, -1.0f, 0.0f);
-
-            GL.TexCoord2(0.0f, textureScale * 1.0f);                    GL.Vertex3(-1.0f, -1.0f, 0.0f);
-            GL.TexCoord2(textureScale * 1.0f, textureScale * 1.0f);     GL.Vertex3(1.0f, -1.0f, 0.0f);
-            GL.TexCoord2(textureScale * 1.0f, 0.0f);                    GL.Vertex3(1.0f, -1.0f, 1.0f);
-            GL.TexCoord2(0.0f, 0.0f);                                   GL.Vertex3(-1.0f, -1.0f, 1.0f);
-
-            GL.TexCoord2(0.0f, textureScale * 1.0f); GL.Vertex3(-1.0f, -1.0f, 0.0f);
-            GL.TexCoord2(textureScale * 1.0f, textureScale * 1.0f); GL.Vertex3(-1.0f, -1.0f, 1.0f);
-            GL.TexCoord2(textureScale * 1.0f, 0.0f); GL.Vertex3(-1.0f, 1.0f, 1.0f);
-            GL.TexCoord2(0.0f, 0.0f); GL.Vertex3(-1.0f, 1.0f, 0.0f);
-
-            GL.TexCoord2(0.0f, textureScale * 1.0f); GL.Vertex3(-1.0f, -1.0f, 1.0f);
-            GL.TexCoord2(textureScale * 1.0f, textureScale * 1.0f); GL.Vertex3(1.0f, -1.0f, 1.0f);
-            GL.TexCoord2(textureScale * 1.0f, 0.0f); GL.Vertex3(1.0f, 1.0f, 1.0f);
-            GL.TexCoord2(0.0f, 0.0f); GL.Vertex3(-1.0f, 1.0f, 1.0f);
-
-            GL.TexCoord2(0.0f, textureScale * 1.0f); GL.Vertex3(-1.0f, 1.0f, 0.0f);
-            GL.TexCoord2(textureScale * 1.0f, textureScale * 1.0f); GL.Vertex3(-1.0f, 1.0f, 1.0f);
-            GL.TexCoord2(textureScale * 1.0f, 0.0f); GL.Vertex3(1.0f, 1.0f, 1.0f);
-            GL.TexCoord2(0.0f, 0.0f); GL.Vertex3(1.0f, 1.0f, 0.0f);
-
-            GL.TexCoord2(0.0f, textureScale * 1.0f); GL.Vertex3(1.0f, -1.0f, 0.0f);
-            GL.TexCoord2(textureScale * 1.0f, textureScale * 1.0f); GL.Vertex3(1.0f, 1.0f, 0.0f);
-            GL.TexCoord2(textureScale * 1.0f, 0.0f); GL.Vertex3(1.0f, 1.0f, 1.0f);
-            GL.TexCoord2(0.0f, 0.0f); GL.Vertex3(1.0f, -1.0f, 1.0f);
-
-            GL.End();
-
-            GL.PopMatrix();
-        }
-
         private void DrawChao()
         {
             modeloChao.Draw();
-            /*
-            GL.PushMatrix();
-            GL.BindTexture(TextureTarget.Texture2D, textureChao);
-
-            GL.Begin(PrimitiveType.Quads);
-            GL.Color3(Color.White);
-            GL.TexCoord2(0.0f, 200.0f); GL.Vertex3(0.0f, 0.0f, 0.0f);
-            GL.TexCoord2(200.0f, 200.0f); GL.Vertex3(0.0f, 100000.0f, 0.0f);
-            GL.TexCoord2(200.0f, 0.0f); GL.Vertex3(100000.0f, 100000.0f, 0.0f);
-            GL.TexCoord2(0.0f, 0.0f); GL.Vertex3(100000.0f, 0.0f, 0.0f);
-            GL.End();
-            GL.PopMatrix();
-             */
         }
 
         private void Iniciar()
