@@ -33,14 +33,12 @@ namespace Radar
         private bool emLoop;
         private Socket cliente = null;
         private Thread threadIO;
-        private int textureChao;
-        private int textureBalaCanhao;
-        private Bitmap chaoBitmap = new Bitmap("grass2.jpg");
-        private Bitmap balaCanahaoBitmap = new Bitmap("balacanhao.jpg");
 
         private Model3D modeloAlvo;
         private Model3D modeloAviao;
         private Model3D modeloTiro;
+        private Model3D modeloChao;
+        private Model3D modeloCanhao;
 
         const float aceleracao = 10/180f;
         OpenTK.Input.Key tecla;
@@ -62,7 +60,6 @@ namespace Radar
 
         protected override void OnUnload(EventArgs e)
         {
-            GL.DeleteTextures(1, ref textureChao);
         }
 
         protected override void OnLoad(EventArgs e)
@@ -78,14 +75,14 @@ namespace Radar
             GL.Enable(EnableCap.Texture2D);
 
             GL.ShadeModel(ShadingModel.Smooth);
-            GL.Light(LightName.Light0, LightParameter.Position, new float[] { (float)posicaoAlvo.X, (float)posicaoAlvo.Y, 10000 });
+            GL.Light(LightName.Light0, LightParameter.Position, new float[] { (float)posicaoAlvo.X-50000, (float)posicaoAlvo.Y, 1000 });
 
             GL.Light(LightName.Light0, LightParameter.Ambient, new float[] { 0.2f, 0.2f, 0.0f, 1.0f });
             GL.Light(LightName.Light0, LightParameter.Diffuse, new float[] { 1.0f, 1.0f, 1.0f, 1.0f });
             GL.Light(LightName.Light0, LightParameter.Specular, new float[] { 1.0f, 1.0f, 1.0f, 1.0f });
 
             GL.Material(MaterialFace.Front, MaterialParameter.Specular, new float[] { 1, 1, 1, 1 });
-            GL.Material(MaterialFace.Front, MaterialParameter.Shininess, new float[] { 70 });
+            GL.Material(MaterialFace.Front, MaterialParameter.Shininess, new float[] { 1000 });
             GL.ColorMaterial(MaterialFace.Front, ColorMaterialParameter.AmbientAndDiffuse);
             GL.Hint(HintTarget.PerspectiveCorrectionHint, HintMode.Nicest);
 
@@ -102,33 +99,18 @@ namespace Radar
             modeloTiro.Texture = new Model3DTexture2D("balacanhao.jpg");
             modeloTiro.Scale = new float[] { 50, 50, 50 };
 
-            textureChao = LoadTexture(chaoBitmap);
+            modeloChao = Model3D.FromFile("mountain.obj");
+            modeloChao.Texture = new Model3DTexture2D("ground_grass.jpg");
+            modeloChao.Texture.Scale = new float[] { 20, 20 };
+            modeloChao.Scale = new float[] { 100000, 100000, 100 };
+            modeloChao.Translate = new float[] { (float)posicaoAlvo.X, (float)posicaoAlvo.Y, 0 };
+
+            modeloCanhao = Model3D.FromFile("Tower.obj");
+            modeloCanhao.Texture = new Model3DTexture2D("tower.jpg");
+            modeloCanhao.Translate = new float[] { (float)posicaoCanhao.X, (float)posicaoCanhao.Y, (float)posicaoCanhao.Z + 1 };
+            modeloCanhao.Scale = new float[] { 500, 500, 500 };
 
             Iniciar();
-        }
-
-        private int LoadTexture(Bitmap bitmap)
-        {
-            int textureID;
-
-            GL.GenTextures(1, out textureID);
-            GL.BindTexture(TextureTarget.Texture2D, textureID);
-
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.GenerateMipmap, (int)All.True);
-            //GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.LinearMipmapLinear);
-            //GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.MirroredRepeat);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.MirroredRepeat);
-
-            BitmapData data = bitmap.LockBits(new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height),
-                ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-
-            GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, data.Width, data.Height, 0,
-                OpenTK.Graphics.OpenGL.PixelFormat.Bgra, PixelType.UnsignedByte, data.Scan0);
-
-            bitmap.UnlockBits(data);
-
-            return textureID;
         }
 
         protected override void OnResize(EventArgs e)
@@ -270,7 +252,8 @@ namespace Radar
 
         private void DrawCanhao()
         {
-            DrawCubo(posicaoCanhao + new Vetor(0,0,10), new Vetor(100, 100, 300), textureBalaCanhao);
+            modeloCanhao.Draw();
+            //DrawCubo(posicaoCanhao + new Vetor(0, 0, 10), new Vetor(100, 100, 300), textureChao);
         }
 
         private void DrawAlvo()
@@ -326,6 +309,8 @@ namespace Radar
 
         private void DrawChao()
         {
+            modeloChao.Draw();
+            /*
             GL.PushMatrix();
             GL.BindTexture(TextureTarget.Texture2D, textureChao);
 
@@ -337,6 +322,7 @@ namespace Radar
             GL.TexCoord2(0.0f, 0.0f); GL.Vertex3(100000.0f, 0.0f, 0.0f);
             GL.End();
             GL.PopMatrix();
+             */
         }
 
         private void Iniciar()
@@ -362,7 +348,7 @@ namespace Radar
                 {
                     if (canhao.Tiros[i].Viajando(tempo) || canhao.Tiros[i].Viajando(tempoAnterior))
                     {
-                        if (AbateuAviao(i, tempo, canhao.Tiros[i]))
+                        if (AbateuAviao2(i, tempo, canhao.Tiros[i]))
                         {
                             aviaoAbatido = true;
                             Console.WriteLine("AVIAO ABATIDO");
@@ -418,20 +404,10 @@ namespace Radar
 
             Console.WriteLine("  {0}: {1} {2}", i, posicaoTiro, (posicaoAviao - posicaoTiro).Mag());
 
-            double m1 = (posicaoAviao.Y-posicaoAviaoAnterior.Y)/(posicaoAviao.X-posicaoAviaoAnterior.X);
-            double m2 = (posicaoTiro.Y-posicaoTiroAnterior.Y)/(posicaoTiro.X-posicaoTiroAnterior.X);
-            double b1 = posicaoAviao.Y - (m1 * posicaoAviao.X);
-            double b2 = posicaoTiro.Y - (m2 * posicaoTiro.X);
-
-            double x = (b2 - b1) / (m1 - m2);
-
-            if (Math.Abs(posicaoAviao.X - posicaoAviaoAnterior.X) >= Math.Abs(x - posicaoAviaoAnterior.X))
+            for (double t = tempoAnterior; t < tempo; t += 3 / Tiro.VELOCIDADEMEDIA)
             {
-                for (double t = tempoAnterior; t < tempo; t += 3/Tiro.VELOCIDADEMEDIA)
-                {
-                    if ((aviao.PosicaoEm(t) - tiro.PosicaoEm(t)).Mag() < 5)
-                        return true;
-                }
+                if ((aviao.PosicaoEm(t) - tiro.PosicaoEm(t)).Mag() < 2)
+                    return true;
             }
 
             return false;

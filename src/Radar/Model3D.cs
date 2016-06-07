@@ -64,23 +64,22 @@ namespace Radar
             {
                 GL.Begin(PrimitiveType.Polygon);
 
-                GL.Color3(Color.Gray);
                 if (face[2] > -1)
                     GL.Normal3(Normals[face[2] - 1]);
                 if (face[1] > -1 && Texture != null)
-                    GL.TexCoord2(VectorsTextureCoord[face[1] - 1]);
+                    GL.TexCoord2(Texture.Scaled(VectorsTextureCoord[face[1] - 1]));
                 GL.Vertex3(Vectors[face[0] - 1]);
 
                 if (face[5] > -1)
                     GL.Normal3(Normals[face[5] - 1]);
                 if (face[4] > -1 && Texture != null)
-                    GL.TexCoord2(VectorsTextureCoord[face[4] - 1]);
+                    GL.TexCoord2(Texture.Scaled(VectorsTextureCoord[face[4] - 1]));
                 GL.Vertex3(Vectors[face[3] - 1]);
 
                 if (face[8] > -1)
                     GL.Normal3(Normals[face[8] - 1]);
                 if (face[7] > -1 && Texture != null)
-                    GL.TexCoord2(VectorsTextureCoord[face[7] - 1]);
+                    GL.TexCoord2(Texture.Scaled(VectorsTextureCoord[face[7] - 1]));
                 GL.Vertex3(Vectors[face[6] - 1]);
 
                 if (face.Length > 9)
@@ -88,7 +87,7 @@ namespace Radar
                     if (face[11] > -1)
                         GL.Normal3(Normals[face[11] - 1]);
                     if (face[10] > -1 && Texture != null)
-                        GL.TexCoord2(VectorsTextureCoord[face[10] - 1]);
+                        GL.TexCoord2(Texture.Scaled(VectorsTextureCoord[face[10] - 1]));
                     GL.Vertex3(Vectors[face[9] - 1]);
                 }
 
@@ -165,6 +164,7 @@ namespace Radar
     public class Model3DTexture2D : IDisposable
     {
         public int TextureID;
+        public float[] Scale = new float[] { 1, 1 };
 
         public Model3DTexture2D(string filename)
         {
@@ -176,6 +176,8 @@ namespace Radar
 
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.MirroredRepeat);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.MirroredRepeat);
 
             using (Bitmap bmp = new Bitmap(filename))
             {
@@ -195,6 +197,11 @@ namespace Radar
         public void Bind()
         {
             GL.BindTexture(TextureTarget.Texture2D, this.TextureID);
+        }
+
+        public float[] Scaled(float[] coords)
+        {
+            return new float[] { coords[0] * Scale[0], coords[1] * Scale[1] };
         }
     }
 }
