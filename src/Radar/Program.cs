@@ -39,6 +39,7 @@ namespace Radar
         private Model3D modeloTiro;
         private Model3D modeloChao;
         private Model3D modeloCanhao;
+        private Model3D modeloBackground;
 
         const float aceleracao = 10/180f;
         OpenTK.Input.Key tecla;
@@ -75,9 +76,9 @@ namespace Radar
             GL.Enable(EnableCap.Texture2D);
 
             GL.ShadeModel(ShadingModel.Smooth);
-            GL.Light(LightName.Light0, LightParameter.Position, new float[] { (float)posicaoAlvo.X-50000, (float)posicaoAlvo.Y, 1000 });
+            GL.Light(LightName.Light0, LightParameter.Position, new float[] { (float)posicaoAlvo.X, (float)posicaoAlvo.Y, 50000 });
 
-            GL.Light(LightName.Light0, LightParameter.Ambient, new float[] { 0.2f, 0.2f, 0.0f, 1.0f });
+            GL.Light(LightName.Light0, LightParameter.Ambient, new float[] { 1.0f, 1.0f, 1.0f, 1.0f });
             GL.Light(LightName.Light0, LightParameter.Diffuse, new float[] { 1.0f, 1.0f, 1.0f, 1.0f });
             GL.Light(LightName.Light0, LightParameter.Specular, new float[] { 1.0f, 1.0f, 1.0f, 1.0f });
 
@@ -109,6 +110,12 @@ namespace Radar
             modeloCanhao.Texture = new Model3DTexture2D("tower.jpg");
             modeloCanhao.Translate = new float[] { (float)posicaoCanhao.X, (float)posicaoCanhao.Y, (float)posicaoCanhao.Z + 1 };
             modeloCanhao.Scale = new float[] { 500, 500, 500 };
+
+            modeloBackground = Model3D.FromFile("ball.obj");
+            modeloBackground.Texture = new Model3DTexture2D("cloud.jpg");
+            modeloBackground.Texture.Scale = new float[] { 2, 2, 2 };
+            modeloBackground.Scale = new float[] { 100000, 100000, 100000 };
+            modeloBackground.Translate = new float[] { (float)posicaoAlvo.X, (float)posicaoAlvo.Y, -50000 };
 
             Iniciar();
         }
@@ -211,6 +218,7 @@ namespace Radar
 
         private void DrawBackground()
         {
+            modeloBackground.Draw();
         }
 
         private void DrawScene()
@@ -229,7 +237,7 @@ namespace Radar
                 if (canhao.Tiros[i].Viajando(sw.Elapsed.TotalSeconds))
                 {
                     var posicao = canhao.Tiros[i].PosicaoEm(sw.Elapsed.TotalSeconds);
-                    modeloTiro.Translate = new float[] { (float)posicao.X, (float)posicao.Y, (float)posicao.Z };
+                    modeloTiro.Translate = new float[] { (float)posicao.X, (float)posicao.Y, (float)posicao.Z - 25 };
                     modeloTiro.Draw();
                 }
             }
